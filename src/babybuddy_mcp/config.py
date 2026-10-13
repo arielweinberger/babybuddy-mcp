@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     # Required
     babybuddy_url: str = ""
+    # Used only by the stdio transport; HTTP clients send their own token as a bearer token
     babybuddy_token: str = ""
 
     # MCP server transport

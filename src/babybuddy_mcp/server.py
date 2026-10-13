@@ -1,5 +1,6 @@
 from fastmcp import FastMCP
 
+from .auth import BabyBuddyTokenVerifier
 from .tools import (
     children,
     diapers,
@@ -23,6 +24,7 @@ mcp = FastMCP(
         "All times should be in ISO 8601 format (e.g. 2024-01-15T14:30:00). "
         "Call list_children first to discover available child IDs."
     ),
+    auth=BabyBuddyTokenVerifier(),
 )
 
 mcp.mount(children.mcp, namespace="children")

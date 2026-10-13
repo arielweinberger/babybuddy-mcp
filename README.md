@@ -39,7 +39,7 @@ MCP_PORT=8080
 docker compose up --build
 ```
 
-The MCP server will be available at `http://localhost:8080/mcp/`.
+The MCP server will be available at `http://localhost:8080/mcp`.
 
 If babybuddy is running on the same Docker network, set `BABYBUDDY_URL` to use its service name (e.g. `http://babybuddy:8000`).
 
@@ -66,13 +66,18 @@ Set `MCP_TRANSPORT=stdio` in `.env`, then add to your Claude Desktop `claude_des
 
 ## Connecting via HTTP transport
 
+Every HTTP request must send the caller's own Baby Buddy API key as a bearer token. The server checks the key against Baby Buddy and makes all API calls as that user, so each person acts under their own Baby Buddy identity. Requests without a valid key get `401 Unauthorized`. `BABYBUDDY_TOKEN` is ignored over HTTP.
+
 Add to your MCP client config:
 
 ```json
 {
   "mcpServers": {
     "babybuddy": {
-      "url": "http://localhost:8080/mcp/"
+      "url": "http://localhost:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer your-babybuddy-api-key"
+      }
     }
   }
 }
@@ -103,7 +108,7 @@ Most `list_*` tools accept `tags` and `ordering` filters where the Baby Buddy AP
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `BABYBUDDY_URL` | Yes | — | URL of your babybuddy instance |
-| `BABYBUDDY_TOKEN` | Yes | — | API token from babybuddy Settings |
+| `BABYBUDDY_TOKEN` | stdio only | — | API token from babybuddy Settings. HTTP clients send their own as a bearer token instead |
 | `MCP_TRANSPORT` | No | `http` | Transport: `http` or `stdio` |
 | `MCP_HOST` | No | `0.0.0.0` | Host to bind (HTTP transport only) |
 | `MCP_PORT` | No | `8080` | Port to listen on (HTTP transport only) |

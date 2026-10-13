@@ -1,8 +1,11 @@
 import httpx
 import pytest
 import respx
+from fastmcp.exceptions import ToolError
+from fastmcp.server.auth import AccessToken
 
 from babybuddy_mcp import client as client_module
+from babybuddy_mcp.auth import BabyBuddyTokenVerifier
 from babybuddy_mcp.client import (
     api_delete,
     api_get,
@@ -14,6 +17,7 @@ from babybuddy_mcp.client import (
     api_post,
     api_post_multipart,
 )
+from babybuddy_mcp.config import settings
 
 BASE = "http://test-babybuddy"
 
@@ -175,6 +179,40 @@ async def test_client_sends_auth_header(mock_api: respx.MockRouter) -> None:
     assert route.called
     request = route.calls[0].request
     assert request.headers["Authorization"] == "Token test-token"
+
+
+async def test_client_prefers_caller_bearer_token(
+    mock_api: respx.MockRouter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    caller = AccessToken(token="caller-token", client_id="alice", scopes=[])
+    monkeypatch.setattr(client_module, "get_access_token", lambda: caller)
+    route = mock_api.get("/api/children/1/").mock(return_value=httpx.Response(200, json={"id": 1}))
+    await api_get("children/1")
+    assert route.calls[0].request.headers["Authorization"] == "Token caller-token"
+
+
+async def test_client_errors_without_any_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "babybuddy_token", "")
+    with pytest.raises(ToolError, match="bearer token"):
+        await api_get("children/1")
+
+
+async def test_verifier_accepts_token_babybuddy_accepts(mock_api: respx.MockRouter) -> None:
+    route = mock_api.get("/api/profile").mock(
+        return_value=httpx.Response(200, json={"user": {"username": "alice"}})
+    )
+    verifier = BabyBuddyTokenVerifier()
+    access_token = await verifier.verify_token("good")
+    assert access_token is not None
+    assert access_token.client_id == "alice"
+    assert route.calls[0].request.headers["Authorization"] == "Token good"
+    await verifier.verify_token("good")
+    assert route.call_count == 1
+
+
+async def test_verifier_rejects_token_babybuddy_rejects(mock_api: respx.MockRouter) -> None:
+    mock_api.get("/api/profile").mock(return_value=httpx.Response(401))
+    assert await BabyBuddyTokenVerifier().verify_token("bad") is None
 
 
 async def test_reset_client_fixture_works() -> None:
