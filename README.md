@@ -83,6 +83,8 @@ Add to your MCP client config:
 }
 ```
 
+For clients that can't set headers, pass the key as a query parameter instead: `http://localhost:8080/mcp?token=your-babybuddy-api-key`. URLs tend to end up in logs, so prefer the header when the client supports it.
+
 ## Available Tools
 
 Tools are organized by domain with namespaced names (e.g. `feedings_list_feedings`).

@@ -5,7 +5,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.auth import AccessToken
 
 from babybuddy_mcp import client as client_module
-from babybuddy_mcp.auth import BabyBuddyTokenVerifier
+from babybuddy_mcp.auth import BabyBuddyTokenVerifier, QueryTokenMiddleware
 from babybuddy_mcp.client import (
     api_delete,
     api_get,
@@ -213,6 +213,30 @@ async def test_verifier_accepts_token_babybuddy_accepts(mock_api: respx.MockRout
 async def test_verifier_rejects_token_babybuddy_rejects(mock_api: respx.MockRouter) -> None:
     mock_api.get("/api/profile").mock(return_value=httpx.Response(401))
     assert await BabyBuddyTokenVerifier().verify_token("bad") is None
+
+
+async def _auth_header_seen(headers: list[tuple[bytes, bytes]], query_string: bytes) -> bytes | None:
+    seen: dict[str, object] = {}
+
+    async def app(scope: dict[str, object], receive: object, send: object) -> None:
+        seen.update(scope)
+
+    scope = {"type": "http", "headers": headers, "query_string": query_string}
+    await QueryTokenMiddleware(app)(scope, None, None)  # type: ignore[arg-type]
+    return dict(seen["headers"]).get(b"authorization")  # type: ignore[call-overload]
+
+
+async def test_query_token_becomes_bearer_header() -> None:
+    assert await _auth_header_seen([], b"token=abc123") == b"Bearer abc123"
+
+
+async def test_query_token_does_not_override_header() -> None:
+    header = [(b"authorization", b"Bearer from-header")]
+    assert await _auth_header_seen(header, b"token=abc123") == b"Bearer from-header"
+
+
+async def test_no_query_token_leaves_request_unauthenticated() -> None:
+    assert await _auth_header_seen([], b"") is None
 
 
 async def test_reset_client_fixture_works() -> None:
